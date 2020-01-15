@@ -1,10 +1,12 @@
 import pygame
 from random import randint
 import numpy as np
+from keras.utils import to_categorical
 from scripts.DQN import Learner
 
 displayOption = True
-speed = 120
+speed = 0
+gameCount = 100
 pygame.font.init()
 
 
@@ -14,7 +16,7 @@ class Game:
         self.gameWidth = gameWidth
         self.gameHeight = gameHeight
         self.gameDisplay = pygame.display.set_mode((gameWidth, gameHeight+60))
-        self.bg = pygame.image.load("assets/background.jpg")
+        self.bg = pygame.image.load("assets/images/background.jpg")
         self.crash = False
         self.player = Player(self)
         self.food = Food()
@@ -32,7 +34,7 @@ class Player(object):
         self.position.append([self.x, self.y])
         self.food = 1
         self.eaten = False
-        self.image = pygame.image.load('assets/snek.jpeg')
+        self.image = pygame.image.load('assets/images/snek.jpeg')
         self.x_change = 20
         self.y_change = 0
 
@@ -64,7 +66,7 @@ class Player(object):
 
         return move
 
-    def doMove(self, move, x, y, game, food):
+    def doMove(self, move, x, y, game, food, dqn):
         move_array = [self.x_change, self.y_change]
 
         if self.eaten:
@@ -111,7 +113,7 @@ class Food(object):
     def __init__(self):
         self.x_food = 240
         self.y_food = 200
-        self.image = pygame.image.load('assets/fruit.png')
+        self.image = pygame.image.load('assets/images/fruit.png')
 
     def foodPosition(self, game, player):
         x_rand = randint(20, game.gameWidth - 40)
@@ -142,23 +144,27 @@ def fetchRecord(score, record):
             return record
 
 
-def displayUI(game, score, record):
-    myfont = pygame.font.SysFont('Segoe UI', 20)
-    myfont_bold = pygame.font.SysFont('Segoe UI', 20, True)
-    text_score = myfont.render('SCORE: ', True, (0, 0, 0))
-    text_score_number = myfont.render(str(score), True, (0, 0, 0))
-    text_highest = myfont.render('HIGHEST SCORE: ', True, (0, 0, 0))
-    text_highest_number = myfont_bold.render(str(record), True, (0, 0, 0))
-    game.gameDisplay.blit(text_score, (120, 660))
-    game.gameDisplay.blit(text_score_number, (180, 660))
+def displayUI(game, score, record, gameCounter):
+    font = pygame.font.Font('assets/fonts/Roboto/Roboto-Italic.ttf', 24)
+    fontBold = pygame.font.Font('assets/fonts/Roboto/Roboto-Bold.ttf', 22)
+    gameNum = font.render('GAME: ', True, (0, 0, 0))
+    gameNumNumber = fontBold.render(str(gameCounter + 1), True, (0, 0, 0))
+    textScore = font.render('SCORE: ', True, (0, 0, 0))
+    textScoreNumber = fontBold.render(str(score), True, (0, 0, 0))
+    text_highest = font.render('HIGHEST SCORE: ', True, (0, 0, 0))
+    text_highest_number = fontBold.render(str(record), True, (0, 0, 0))
+    game.gameDisplay.blit(gameNum, (40, 660))
+    game.gameDisplay.blit(gameNumNumber, (140, 660))
+    game.gameDisplay.blit(textScore, (200, 660))
+    game.gameDisplay.blit(textScoreNumber, (300, 660))
     game.gameDisplay.blit(text_highest, (360, 660))
-    game.gameDisplay.blit(text_highest_number, (480, 660))
+    game.gameDisplay.blit(text_highest_number, (560, 660))
     game.gameDisplay.blit(game.bg, (10, 10))
 
 
-def display(player, food, game, record):
+def display(player, food, game, record, gameCounter):
     game.gameDisplay.fill((255, 255, 255))
-    displayUI(game, game.score, record)
+    displayUI(game, game.score, record, gameCounter)
     player.displayPlayer(player.position[-1][0], player.position[-1][1], player.food, game)
     food.displayFood(food.x_food, food.y_food, game)
 
@@ -167,37 +173,92 @@ def updateScreen():
     pygame.display.update()
 
 
-def initializeGame(player, game, food):
+def initializeGame(player, game, food, dqn):
+    state_init1 = dqn.fetchState(game, player, food)
     action = [1, 0, 0]
-    player.doMove(action, player.x, player.y, game, food)
+    player.doMove(action, player.x, player.y, game, food, dqn)
+    state_init2 = dqn.fetchState(game, player, food)
+    reward1 = dqn.setReward(player, game.crash)
+    dqn.pushIntoMemory(state_init1, action, reward1, state_init2, game.crash)
+    dqn.replayTrain(dqn.memory)
+    
+
+# def run():
+#     game = Game(640, 640)
+#     player1 = game.player
+#     food1 = game.food
+#     record = 0
+
+#     initializeGame(player1, game, food1)
+#     if displayOption:
+#         display(player1, food1, game, record)
+
+#     while not game.crash:
+#         pygame.time.delay(speed)
+
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 pygame.quit()
+
+#             move = player1.move()
+            
+#         player1.doMove(move, player1.x, player1.y, game, food1)
+                 
+#         display(player1,food1,game,record)
+    
+#     print('Score: ', game.score)
 
 
-def run():
-    game = Game(640, 640)
+def trainRun():
+    game = Game(640,640)
     player1 = game.player
     food1 = game.food
     record = 0
-
-    initializeGame(player1, game, food1)
-    if displayOption:
-        display(player1, food1, game, record)
-
-    while not game.crash:
-        pygame.time.delay(speed)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-
-            move = player1.move()
-            
-        player1.doMove(move, player1.x, player1.y, game, food1)
-                 
-        display(player1,food1,game,record)
+    gameCounter = 0
+    dqn = Learner()
     
-    print('Score: ', game.score)
+    while gameCounter < gameCount:
+        game = Game(640,640)
+        player1 = game.player
+        food1 = game.food
+
+        initializeGame(player1, game, food1, dqn)
+        if displayOption:
+            display(player1, food1, game, record, gameCounter)
+
+        while not game.crash:
+            dqn.rndNum = gameCount/2 - gameCounter
+
+            oldState = dqn.fetchState(game, player1, food1)
+
+            if randint(0, 100) < dqn.rndNum:
+                finalMove = to_categorical(randint(0,2), num_classes=3)
+            else:
+                prediction = dqn.model.predict(oldState.reshape((1,11)))
+                finalMove = to_categorical(np.argmax(prediction[0]), num_classes=3)
+
+            player1.doMove(finalMove, player1.x, player1.y, game, food1, dqn)
+            newState = dqn.fetchState(game, player1, food1)
+
+            reward = dqn.setReward(player1, game.crash)
+
+            dqn.shortTrain(oldState, finalMove, reward, newState, game.crash)
+
+            dqn.pushIntoMemory(oldState, finalMove, reward, newState, game.crash)
+            record = fetchRecord(game.score, record)
+
+            if displayOption:
+                display(player1, food1, game, record, gameCounter)
+                pygame.time.wait(speed)
+
+        dqn.replayTrain(dqn.memory)
+        gameCounter += 1
+
+        print('Game: ',gameCounter,'Score: ',game.score)
+
+    pygame.quit()
 
 
 if __name__ == "__main__":
     pygame.init()
-    run()
+    trainRun()

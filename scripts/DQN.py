@@ -19,6 +19,11 @@ class Learner(object):
     def buildModel(self):
         model = Sequential()
         model.add(Dense(units = 120, activation='relu', input_dim = 11))
+        model.add(Dropout(0.2))
+        model.add(Dense(units = 120, activation='relu'))
+        model.add(Dropout(0.2))
+        model.add(Dense(units = 120, activation='relu'))
+        model.add(Dropout(0.2))
         model.add(Dense(units = 3, activation='softmax'))
         opt = Adam(self.alpha)
         model.compile(loss='mse', optimizer=opt)
@@ -30,7 +35,7 @@ class Learner(object):
         if crash:
             self.reward = -10
         if player.eaten:
-            self.reward = 10
+            self.reward = 20
         return self.reward
 
     def fetchState(self, game, player, food):

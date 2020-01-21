@@ -6,7 +6,7 @@ from scripts.DQN import Learner
 
 displayOption = True
 speed = 0
-gameCount = 100
+gameCount = 10000
 pygame.font.init()
 
 
@@ -227,7 +227,7 @@ def trainRun():
             display(player1, food1, game, record, gameCounter)
 
         while not game.crash:
-            dqn.rndNum = gameCount/2 - gameCounter
+            dqn.rndNum = gameCount*0.05 - gameCounter
 
             oldState = dqn.fetchState(game, player1, food1)
 
